@@ -3,40 +3,50 @@
 pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "./interfaces/IERC20.sol";
 
 contract BridgeEth is OwnableUpgradeable {
     using AddressUpgradeable for address;
 
-    IERC20Upgradeable public _token;
+    IERC20 public _token;
     mapping(address => uint256) public _convertProcess;
 
-    enum Step {
-        Lock,
-        Unlock
-    }
+    string private LOCK = "LOCK";
+    string private UNLOCK = "UNLOCK";
+
     event ConvertTransfer(
         address from,
         uint256 amount,
         uint256 date,
-        Step indexed step
+        string sign
     );
 
     function initialize(address tokenAddress) public initializer {
         OwnableUpgradeable.__Ownable_init();
-        _token = IERC20Upgradeable(tokenAddress);
+        _token = IERC20(tokenAddress);
     }
 
     function lockToken(uint256 amount) external {
-        _token.transferFrom(owner(), address(this), amount);
-        _convertProcess[msg.sender] += amount;
-        emit ConvertTransfer(msg.sender, amount, block.timestamp, Step.Lock);
+        _lock(owner(), address(this), amount);
+        _convertProcess[owner()] += amount;
+        emit ConvertTransfer(owner(), amount, block.timestamp, LOCK);
     }
 
-    function unlockToken(uint256 amount) external onlyOwner {}
+    function unlockToken(address to, uint256 amount) external onlyOwner {
+        _unlockToken(to, amount);
+        emit ConvertTransfer(owner(), amount, block.timestamp, UNLOCK);
+    }
 
-    function _withdrawToken(address to, uint256 amount) private {
+    function _lock(
+        address from,
+        address to,
+        uint256 amount
+    ) private {
+        _token.transferFrom(from, to, amount);
+    }
+
+    function _unlockToken(address to, uint256 amount) private {
         _token.transfer(to, amount);
     }
 }
