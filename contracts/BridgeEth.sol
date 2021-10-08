@@ -10,32 +10,86 @@ contract BridgeEth is OwnableUpgradeable {
     using AddressUpgradeable for address;
 
     IERC20 public _token;
-    mapping(address => uint256) public _convertProcess;
 
-    string private LOCK = "LOCK";
-    string private UNLOCK = "UNLOCK";
+    mapping(address => uint256) public _lockAmounts;
+    mapping(uint256 => bool) public _convertProcess;
+
+    bytes32 private LOCK;
+    bytes32 private UNLOCK;
+    bytes32 private VALIDATOR;
+
+    bool _isPaused;
 
     event ConvertTransfer(
         address from,
         uint256 amount,
         uint256 date,
-        string sign
+        bytes32 type_sign,
+        bytes32 validator_sign
     );
 
-    function initialize(address tokenAddress) public initializer {
+    function initialize(address tokenAddress, string memory validator)
+        public
+        initializer
+    {
         OwnableUpgradeable.__Ownable_init();
         _token = IERC20(tokenAddress);
+        LOCK = keccak256("LOCK");
+        UNLOCK = keccak256("UNLOCK");
+        VALIDATOR = bytes32(abi.encode(validator));
+        _isPaused = false;
     }
 
     function lockToken(uint256 amount) external {
-        _lock(owner(), address(this), amount);
-        _convertProcess[owner()] += amount;
-        emit ConvertTransfer(owner(), amount, block.timestamp, LOCK);
+        require(_isPaused == false, "BridgeEth: bridge is paused");
+        _lock(_msgSender(), address(this), amount);
+        _lockAmounts[_msgSender()] += amount;
+        emit ConvertTransfer(
+            _msgSender(),
+            amount,
+            block.timestamp,
+            LOCK,
+            VALIDATOR
+        );
     }
 
-    function unlockToken(address to, uint256 amount) external onlyOwner {
+    function unlockToken(
+        address to,
+        uint256 amount,
+        uint256 nonce
+    ) external onlyOwner {
+        require(
+            _lockAmounts[to] >= amount,
+            "BridgeEth: convert amount exceeds balance"
+        );
+        require(
+            _convertProcess[nonce] == false,
+            "BridgeEth: transfer already processed"
+        );
+        _convertProcess[nonce] = true;
+        _lockAmounts[to] -= amount;
         _unlockToken(to, amount);
-        emit ConvertTransfer(owner(), amount, block.timestamp, UNLOCK);
+        emit ConvertTransfer(to, amount, block.timestamp, UNLOCK, VALIDATOR);
+    }
+
+    function changeToken(address tokenAddress) external onlyOwner {
+        require(
+            address(_token) != tokenAddress,
+            "BridgeEth: same token can not be changed"
+        );
+        _token = IERC20(tokenAddress);
+    }
+
+    function changeValidator(string memory validator) external onlyOwner {
+        require(
+            VALIDATOR != bytes32(abi.encode(validator)),
+            "BridgeEth: same validator can not be changed"
+        );
+        VALIDATOR = bytes32(abi.encode(validator));
+    }
+
+    function setPause(bool pause) external onlyOwner {
+        _isPaused = pause;
     }
 
     function _lock(

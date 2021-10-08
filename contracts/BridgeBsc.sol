@@ -37,10 +37,10 @@ contract BridgeBsc is OwnableUpgradeable {
         emit ConvertTransfer(msg.sender, amount, block.timestamp, BURN);
     }
 
-    function mintToken(uint256 amount) external onlyOwner {
-        _mint(owner(), amount);
-        _convertProcess[msg.sender] += amount;
-        emit ConvertTransfer(msg.sender, amount, block.timestamp, MINT);
+    function mintToken(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+        _convertProcess[to] += amount;
+        emit ConvertTransfer(to, amount, block.timestamp, MINT);
     }
 
     function _withdrawToken(address to, uint256 amount) external onlyOwner {
