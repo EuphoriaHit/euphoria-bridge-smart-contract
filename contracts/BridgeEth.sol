@@ -57,7 +57,7 @@ contract BridgeEth is OwnableUpgradeable {
         address to,
         uint256 amount,
         uint256 nonce,
-        bytes32 validator
+        string memory validator
     ) external onlyOwner {
         require(
             _convertProcess[nonce] == false,

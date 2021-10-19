@@ -35,18 +35,18 @@ contract BridgeBsc is OwnableUpgradeable {
         _token = IERC20(tokenAddress);
         BURN = keccak256("BURN");
         MINT = keccak256("MINT");
-        VALIDATOR = bytes32(abi.encode(validator));
+        VALIDATOR = keccak256(abi.encodePacked(validator));
         _isPaused = false;
     }
 
     function burnToken(uint256 amount) external {
         require(_isPaused == false, "BridgeEth: bridge is paused");
         require(
-            _mintedAmount[owner()] >= amount,
+            _mintedAmount[_msgSender()] >= amount,
             "BSC bridge: convert amount exceeds balance"
         );
-        _burn(owner(), amount);
-        _mintedAmount[owner()] -= amount;
+        _burn(_msgSender(), amount);
+        _mintedAmount[_msgSender()] -= amount;
         emit ConvertTransfer(
             msg.sender,
             amount,
@@ -60,7 +60,7 @@ contract BridgeBsc is OwnableUpgradeable {
         address to,
         uint256 amount,
         uint256 nonce,
-        string memory validator
+        string calldata validator
     ) external onlyOwner {
         require(_isPaused == false, "BridgeBsc: bridge is paused");
         require(
