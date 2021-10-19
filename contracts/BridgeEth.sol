@@ -16,7 +16,7 @@ contract BridgeEth is OwnableUpgradeable {
 
     bytes32 private LOCK;
     bytes32 private UNLOCK;
-    bytes32 private VALIDATOR;
+    bytes32 public VALIDATOR;
 
     bool _isPaused;
 
@@ -36,7 +36,7 @@ contract BridgeEth is OwnableUpgradeable {
         _token = IERC20(tokenAddress);
         LOCK = keccak256("LOCK");
         UNLOCK = keccak256("UNLOCK");
-        VALIDATOR = bytes32(abi.encode(validator));
+        VALIDATOR = keccak256(abi.encodePacked(validator));
         _isPaused = false;
     }
 
@@ -56,15 +56,20 @@ contract BridgeEth is OwnableUpgradeable {
     function unlockToken(
         address to,
         uint256 amount,
-        uint256 nonce
+        uint256 nonce,
+        bytes32 validator
     ) external onlyOwner {
-        require(
-            _lockAmounts[to] >= amount,
-            "BridgeEth: convert amount exceeds balance"
-        );
         require(
             _convertProcess[nonce] == false,
             "BridgeEth: transfer already processed"
+        );
+        require(
+            VALIDATOR == keccak256(abi.encodePacked(validator)),
+            "BridgeEth: Unkown validator off-chain"
+        );
+        require(
+            _lockAmounts[to] >= amount,
+            "BridgeEth: convert amount exceeds balance"
         );
         _convertProcess[nonce] = true;
         _lockAmounts[to] -= amount;
@@ -82,10 +87,10 @@ contract BridgeEth is OwnableUpgradeable {
 
     function changeValidator(string memory validator) external onlyOwner {
         require(
-            VALIDATOR != bytes32(abi.encode(validator)),
+            VALIDATOR != keccak256(abi.encodePacked(validator)),
             "BridgeEth: same validator can not be changed"
         );
-        VALIDATOR = bytes32(abi.encode(validator));
+        VALIDATOR = keccak256(abi.encodePacked(validator));
     }
 
     function setPause(bool pause) external onlyOwner {
