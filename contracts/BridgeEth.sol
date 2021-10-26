@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.9;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "../node_modules/@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../node_modules/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "./interfaces/IERC20.sol";
 
 contract BridgeEth is OwnableUpgradeable {
@@ -11,7 +11,8 @@ contract BridgeEth is OwnableUpgradeable {
 
     IERC20 public _token;
 
-    mapping(address => uint256) public _lockAmounts;
+    uint256 _unlockedTokensAmount;
+    uint256 _maxTotalSupply;
     mapping(uint256 => bool) public _convertProcess;
 
     bytes32 private LOCK;
@@ -38,12 +39,18 @@ contract BridgeEth is OwnableUpgradeable {
         UNLOCK = keccak256("UNLOCK");
         VALIDATOR = keccak256(abi.encodePacked(validator));
         _isPaused = false;
+        _unlockedTokensAmount = 0;
+        _maxTotalSupply = _token.totalSupply();
+    }
+
+    function getUnlockedTokensAmount() view external returns(uint256) {
+        return _unlockedTokensAmount;
     }
 
     function lockToken(uint256 amount) external {
         require(_isPaused == false, "BridgeEth: bridge is paused");
         _lock(_msgSender(), address(this), amount);
-        _lockAmounts[_msgSender()] += amount;
+        _unlockedTokensAmount -= amount;
         emit ConvertTransfer(
             _msgSender(),
             amount,
@@ -67,12 +74,14 @@ contract BridgeEth is OwnableUpgradeable {
             VALIDATOR == keccak256(abi.encodePacked(validator)),
             "BridgeEth: Unkown validator off-chain"
         );
+        
         require(
-            _lockAmounts[to] >= amount,
+            _maxTotalSupply >= _unlockedTokensAmount + amount,
             "BridgeEth: convert amount exceeds balance"
         );
+        
         _convertProcess[nonce] = true;
-        _lockAmounts[to] -= amount;
+        _unlockedTokensAmount += amount;
         _unlockToken(to, amount);
         emit ConvertTransfer(to, amount, block.timestamp, UNLOCK, VALIDATOR);
     }
